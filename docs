@@ -974,7 +974,7 @@ async function pdfFileToJpegDataUrl(file, pageNumber = 1, maxWidth = 1700) {
 }
 
 // ─ ─  Versand (Google Apps Script Web-App) ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
-const SCRIPT_WEBAPP_URL = 'https://script.google.com/a/macros/athanor.de/s/AKfycbyT0q3aA7feIBYAhUNphRjeRodHWQn8hx1JNFTiUbZvPiWamDyuuaRRLe_SSzOyo_gM3A/exec';
+const SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzyspzjGy4KmX5IvepQ_4z5WXuXfDGg1PjIMAnm1vX-DoNYB5nmqbHrUxKbNQcSF1cN5Q/exec';
 const SCRIPT_TOKEN = 'Athanor2026__Abrechnung__s3cr3t__7Hk2Pp9QxLmN4vT6';
 
 const KATEGORIEN = [
@@ -1953,4 +1953,3 @@ function showToast(msg, type) {
 </script>
 </body>
 </html>
-
