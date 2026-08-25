@@ -503,6 +503,18 @@ select {
 
 .sig-btn:active { background: rgba(242,140,40,0.10); border-color: var(--neon-magenta); color: var(--neon-magenta); }
 
+.sig-file-input {
+  display: none;
+}
+
+.sig-upload-name {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--gray-helmet);
+  overflow-wrap: anywhere;
+}
+
 .sig-pad {
   width: 100%;
   height: 160px;
@@ -893,11 +905,14 @@ select {
       <div class="sig-head">
         <div class="sig-label">Unterschrift <span class="req">*</span></div>
         <div class="sig-actions">
+          <button class="sig-btn" type="button" onclick="document.getElementById('sigFile').click()">PNG/JPEG hochladen</button>
           <button class="sig-btn" type="button" onclick="clearSignature()">Leeren</button>
+          <input class="sig-file-input" type="file" id="sigFile" accept="image/png,image/jpeg,image/jpg" onchange="handleSignatureFile(this)" />
         </div>
       </div>
       <canvas id="sigPad" class="sig-pad" aria-label="Unterschrift"></canvas>
-      <div class="sig-help">Mit dem Finger oder Stift unterschreiben. Falls die Fläche leer bleibt, kann das PDF nicht erstellt werden.</div>
+      <span class="sig-upload-name" id="sigUploadName" aria-live="polite"></span>
+      <div class="sig-help">Mit dem Finger oder Stift unterschreiben oder eine PNG-/JPEG-Datei hochladen. Falls keine Unterschrift vorhanden ist, kann das PDF nicht erstellt werden.</div>
     </div>
 
     <p class="check-note">
@@ -1281,7 +1296,9 @@ async function buildPDF(receiptNo) {
   const vorschuss = document.getElementById('vorschuss').value;
   const vorschussBetrag = vorschuss === 'ja' ? (parseFloat(document.getElementById('vorschussBetrag').value) || 0) : 0;
   const emailSender = document.getElementById('emailSender').value.trim();
-  const heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const createdDate = new Date();
+  const heute = createdDate.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const auszahlungsdatum = addBusinessDays_(createdDate, 5).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
 
   const posData = await Promise.all(positions.map(async p => {
     const file = p.file;
@@ -1368,17 +1385,18 @@ async function buildPDF(receiptNo) {
   doc.text('Projektkostenabrechnung', 20, y);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(110, 110, 110);
   doc.text('Erstellt am: ' + heute, 190, y, { align: 'right' });
+  doc.text('Voraussichtliche Auszahlung: ' + auszahlungsdatum, 190, y + 4.5, { align: 'right' });
 
-  // Vorgangsnummer prominent unter "Erstellt am"
+  // Projektkennung unter den Datumsangaben
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(26, 26, 26);
-  doc.text(String(receiptNo || '').trim(), 190, y + 5.2, { align: 'right' });
+  doc.text(String(receiptNo || '').trim(), 190, y + 9.5, { align: 'right' });
 
-  y += 14;
+  y += 18;
   doc.setDrawColor(220, 215, 210);
   doc.setLineWidth(0.4);
   doc.line(20, y, 190, y);
@@ -1495,15 +1513,15 @@ async function buildPDF(receiptNo) {
 
   doc.setDrawColor(150, 145, 140);
   doc.setLineWidth(0.4);
-  doc.line(20, y, 92, y);
+  doc.line(20, y, 130, y);
 
   if (sigDataUrl) {
     try {
       const sigFmt = sigDataUrl.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
       const boxX = 20;
-      const boxY = y - 18;
-      const boxW = 72;
-      const boxH = 16;
+      const boxY = y - 30;
+      const boxW = 110;
+      const boxH = 27;
 
       let props = null;
       try { props = doc.getImageProperties(sigDataUrl); } catch (_) { props = null; }
@@ -1631,11 +1649,12 @@ async function submitForm() {
   const overlayText = document.getElementById('sendingText');
   const overlaySub = document.getElementById('sendingSub');
   if (overlay) overlay.style.display = 'flex';
-  if (overlayText) overlayText.textContent = 'Projektkennung wird erstellt …';
+  if (overlayText) overlayText.textContent = 'Projektkennung wird vorbereitet …';
   if (overlaySub) overlaySub.textContent = 'Bitte nicht schließen.';
 
   try {
-    // 1) Projektkennung aus Projektnummer und projektspezifischer laufender Nummer holen
+    // Vorschaukennung für das PDF abfragen. Das Apps Script muss
+    // action=nextNo als reine Vorschau ohne Zählerverbrauch behandeln.
     let receiptNo = '';
     try {
       const projectNoForReference = encodeURIComponent(document.getElementById('projektnummer').value.trim());
@@ -1653,7 +1672,7 @@ async function submitForm() {
       throw new Error('Projektkennung konnte nicht erstellt werden. Bitte prüfe die Verbindung zur Web-App.');
     }
 
-    // 2) PDF bauen
+    // PDF bauen
     if (overlayText) overlayText.textContent = `PDF wird erstellt (${receiptNo}) …`;
     if (overlaySub) overlaySub.textContent = 'Belege werden eingebettet – das kann je nach Anzahl/Größe etwas dauern.';
 
@@ -1763,6 +1782,10 @@ function resetForm(silent) {
   });
 
   clearSignature();
+  const sigFile = document.getElementById('sigFile');
+  if (sigFile) sigFile.value = '';
+  const sigUploadName = document.getElementById('sigUploadName');
+  if (sigUploadName) sigUploadName.textContent = '';
 
   positions = [];
   posId = 0;
@@ -1836,6 +1859,67 @@ function sigEnd(e) {
   e && e.preventDefault && e.preventDefault();
 }
 
+function handleSignatureFile(input) {
+  const file = input && input.files ? input.files[0] : null;
+  if (!file) return;
+  const allowed = ['image/png', 'image/jpeg', 'image/jpg'];
+  if (!allowed.includes(file.type)) {
+    showToast('Nur PNG- und JPEG-Dateien sind für die Unterschrift zulässig.', 'error');
+    input.value = '';
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('Die Unterschriftsdatei ist zu groß (max. 10 MB).', 'error');
+    input.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function() {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.getElementById('sigPad');
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(1, Math.floor(rect.width * dpr));
+      const h = Math.max(1, Math.floor(rect.height * dpr));
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+
+      const pad = Math.round(Math.min(w, h) * 0.08);
+      const scale = Math.min((w - 2 * pad) / img.width, (h - 2 * pad) / img.height);
+      const dw = Math.max(1, Math.round(img.width * scale));
+      const dh = Math.max(1, Math.round(img.height * scale));
+      const dx = Math.round((w - dw) / 2);
+      const dy = Math.round((h - dh) / 2);
+      ctx.drawImage(img, dx, dy, dw, dh);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 2.4 * dpr;
+      ctx.strokeStyle = '#111';
+      sigHasInk = true;
+      canvas.classList.remove('err-pad');
+      const nameEl = document.getElementById('sigUploadName');
+      if (nameEl) nameEl.textContent = 'Geladene Unterschrift: ' + file.name;
+    };
+    img.onerror = function() {
+      showToast('Die Unterschriftsdatei konnte nicht gelesen werden.', 'error');
+      input.value = '';
+    };
+    img.src = reader.result;
+  };
+  reader.onerror = function() {
+    showToast('Die Unterschriftsdatei konnte nicht gelesen werden.', 'error');
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
 function clearSignature() {
   const canvas = document.getElementById('sigPad');
   if (!canvas) return;
@@ -1845,10 +1929,25 @@ function clearSignature() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   sigHasInk = false;
   canvas.classList.remove('err-pad');
+  const file = document.getElementById('sigFile');
+  if (file) file.value = '';
+  const nameEl = document.getElementById('sigUploadName');
+  if (nameEl) nameEl.textContent = '';
 }
 
 function hasSignature() {
   return !!sigHasInk;
+}
+
+function addBusinessDays_(date, days) {
+  const result = new Date(date.getTime());
+  let remaining = Number(days) || 0;
+  while (remaining > 0) {
+    result.setDate(result.getDate() + 1);
+    const day = result.getDay();
+    if (day !== 0 && day !== 6) remaining--;
+  }
+  return result;
 }
 
 function getSignatureDataURL() {
