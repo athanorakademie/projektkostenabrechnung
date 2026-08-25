@@ -1513,7 +1513,7 @@ async function buildPDF(receiptNo) {
 
   doc.setDrawColor(150, 145, 140);
   doc.setLineWidth(0.4);
-  doc.line(20, y, 130, y);
+  doc.line(20, y, 92, y);
 
   if (sigDataUrl) {
     try {
@@ -1531,7 +1531,8 @@ async function buildPDF(receiptNo) {
       const s = Math.min(boxW / iw, boxH / ih);
       const w = iw * s;
       const h = ih * s;
-      const x = boxX + (boxW - w) / 2;
+      // Links bündig, innerhalb des Signaturbereichs vertikal zentriert.
+      const x = boxX;
       const yy = boxY + (boxH - h) / 2;
 
       doc.addImage(sigDataUrl, sigFmt, x, yy, w, h, undefined, 'FAST');
@@ -1649,31 +1650,17 @@ async function submitForm() {
   const overlayText = document.getElementById('sendingText');
   const overlaySub = document.getElementById('sendingSub');
   if (overlay) overlay.style.display = 'flex';
-  if (overlayText) overlayText.textContent = 'Projektkennung wird vorbereitet …';
+  if (overlayText) overlayText.textContent = 'PDF wird erstellt …';
   if (overlaySub) overlaySub.textContent = 'Bitte nicht schließen.';
 
   try {
-    // Vorschaukennung für das PDF abfragen. Das Apps Script muss
-    // action=nextNo als reine Vorschau ohne Zählerverbrauch behandeln.
-    let receiptNo = '';
-    try {
-      const projectNoForReference = encodeURIComponent(document.getElementById('projektnummer').value.trim());
-      const r = await fetch(SCRIPT_WEBAPP_URL + '?action=nextNo&projektnummer=' + projectNoForReference, {
-        method: 'GET',
-        mode: 'cors',
-        cache: 'no-store'
-      });
-      const t = await r.text();
-      const j = t ? JSON.parse(t) : null;
-      if (j && j.ok && j.reference) receiptNo = String(j.reference);
-    } catch (_) {}
+    // 1) PDF zunächst mit der Projektnummer als vorläufiger Kennung bauen.
+    // Die endgültige Projektkennung wird erst beim erfolgreichen Versand im Backend vergeben.
+    const projektnummerPreview = document.getElementById('projektnummer').value.trim();
+    const receiptNo = projektnummerPreview;
 
-    if (!receiptNo) {
-      throw new Error('Projektkennung konnte nicht erstellt werden. Bitte prüfe die Verbindung zur Web-App.');
-    }
-
-    // PDF bauen
-    if (overlayText) overlayText.textContent = `PDF wird erstellt (${receiptNo}) …`;
+    // 2) PDF bauen
+    if (overlayText) overlayText.textContent = 'PDF wird erstellt …';
     if (overlaySub) overlaySub.textContent = 'Belege werden eingebettet – das kann je nach Anzahl/Größe etwas dauern.';
 
     const doc = await buildPDF(receiptNo);
