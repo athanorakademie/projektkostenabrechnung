@@ -1513,7 +1513,7 @@ async function buildPDF(receiptNo) {
 
   doc.setDrawColor(150, 145, 140);
   doc.setLineWidth(0.4);
-  doc.line(20, y, 92, y);
+  doc.line(20, y, 130, y);
 
   if (sigDataUrl) {
     try {
@@ -2000,7 +2000,7 @@ function getSignatureDataURL() {
   octx.fillStyle = '#ffffff';
   octx.fillRect(0, 0, exportW, exportH);
 
-  const margin = Math.round(Math.min(exportW, exportH) * 0.06);
+  const margin = Math.round(Math.min(exportW, exportH) * 0.02);
   const boxW = exportW - 2 * margin;
   const boxH = exportH - 2 * margin;
   const s = Math.min(boxW / cw, boxH / ch);
